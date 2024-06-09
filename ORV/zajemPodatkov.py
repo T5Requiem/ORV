@@ -1,10 +1,17 @@
 import cv2
 import os
 import numpy as np
-from pyfcm import FCMNotification
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision
+import torchvision.transforms as transforms
+from torch.utils.data import DataLoader, random_split
+from torchvision.datasets import ImageFolder
+from PIL import Image
 
 
-def capture_video_and_extract_frames(user_id, duration=3, save_path='datasetraw'):
+def capture_video_and_extract_frames(user_id, duration=5, save_path='datasetraw'):
     # Ustvari mapo, če ne obstaja
     if not os.path.exists(save_path):
         os.makedirs(save_path)
@@ -36,7 +43,7 @@ def capture_video_and_extract_frames(user_id, duration=3, save_path='datasetraw'
     cap.release()
     cv2.destroyAllWindows()
 
-capture_video_and_extract_frames(user_id=1)
+#capture_video_and_extract_frames(user_id=1)
 
 
 def preprocess_image(image_path):
@@ -66,7 +73,7 @@ def preprocess_dataset(dataset_path='datasetraw', processed_path='datasetprocess
         cv2.imwrite(processed_img_path, processed_img)
         print(f"{processed_img_path} saved.")
 
-preprocess_dataset()
+#preprocess_dataset()
 
 def augment_image(image):
     # Horizontalno zrcaljenje, sprememba svetlosti in kontrasta
@@ -105,8 +112,8 @@ def augment_image(image):
 
 
 def augment_dataset(dataset_path='datasetprocessed', augmented_path='datasetaugmented'):
-    if not os.path.exists(augmented_path):
-        os.makedirs(augmented_path)
+    if not os.path.exists("images/" + augmented_path):
+        os.makedirs("images/" + augmented_path)
 
     image_index = 0
     for filename in os.listdir(dataset_path):
@@ -114,9 +121,23 @@ def augment_dataset(dataset_path='datasetprocessed', augmented_path='datasetaugm
         image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
         augmented_image = augment_image(image)
-        aug_img_path = os.path.join(augmented_path, filename)
+        aug_img_path = os.path.join("images/" + augmented_path, filename)
         cv2.imwrite(aug_img_path, augmented_image)
         print(f"{aug_img_path} saved.")
         image_index += 1
 
 augment_dataset()
+
+# Nalaganje dataseta
+train_dataset = ImageFolder(root='./images')
+test_dataset = ImageFolder(root='./images')
+
+# Razdelitev učne množice na učni in validacijski del
+train_size = int(0.8 * len(train_dataset))
+val_size = len(train_dataset) - train_size
+train_dataset, val_dataset = random_split(train_dataset, [train_size, val_size])
+
+# Določitev nalagalnikov
+train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False)
+test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
