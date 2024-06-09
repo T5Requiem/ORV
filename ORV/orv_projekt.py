@@ -126,11 +126,15 @@ def augment_dataset(dataset_path='datasetprocessed', augmented_path='datasetaugm
         print(f"{aug_img_path} saved.")
         image_index += 1
 
-augment_dataset()
+#augment_dataset()
 
 # Nalaganje dataseta
-train_dataset = ImageFolder(root='./images')
-test_dataset = ImageFolder(root='./images')
+transform = transforms.Compose([
+    transforms.ToTensor(),
+])
+
+train_dataset = ImageFolder(root='./images', transform=transform)
+test_dataset = ImageFolder(root='./images', transform=transform)
 
 # Razdelitev učne množice na učni in validacijski del
 train_size = int(0.8 * len(train_dataset))
@@ -141,3 +145,103 @@ train_dataset, val_dataset = random_split(train_dataset, [train_size, val_size])
 train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=128, shuffle=False)
 test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False)
+
+
+# Definicija modela
+class TrafficSignNet(nn.Module):
+    def __init__(self, num_classes=1, num_repeats=3, base_channels=32):
+        super(TrafficSignNet, self).__init__()
+        layers = []
+        channels = base_channels
+        layers.append(nn.Conv2d(3, channels, kernel_size=3, padding=1))
+        layers.append(nn.SELU())
+        layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+        input_channels = 32
+        output_channels = 64
+        for _ in range(num_repeats - 1):
+            layers.append(nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=1))
+            layers.append(nn.SELU())
+            layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
+            input_channels = input_channels * 2
+            output_channels = output_channels * 2
+
+        self.conv_layers = nn.Sequential(*layers)
+        self.fc1 = nn.Linear(128 * 8 * 8 * 4, 128)
+        self.fc2 = nn.Linear(128, num_classes)
+
+    def forward(self, x):
+        x = self.conv_layers(x)
+        x = x.view(x.size(0), -1)
+        x = torch.tanh(self.fc1(x))
+        x = torch.softmax(self.fc2(x), dim=1)
+        return x
+
+
+# Primer osnovnega modela
+model = TrafficSignNet()
+
+# Priprava za učenje
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+# Trening modela
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model.to(device)
+
+
+def train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=25):
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+        for inputs, labels in train_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item() * inputs.size(0)
+
+        epoch_loss = running_loss / len(train_loader.dataset)
+
+        model.eval()
+        val_loss = 0.0
+        corrects = 0
+        with torch.no_grad():
+            for inputs, labels in val_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                val_loss += loss.item() * inputs.size(0)
+                _, preds = torch.max(outputs, 1)
+                corrects += torch.sum(preds == labels.data)
+
+        val_loss = val_loss / len(val_loader.dataset)
+        val_acc = corrects.double() / len(val_loader.dataset) * 100
+
+        print(
+            f'Epoch {epoch}/{num_epochs - 1}, Loss: {epoch_loss:.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.4f}%')
+
+
+train_model(model, train_loader, val_loader, criterion, optimizer, num_epochs=10)
+torch.save(model.state_dict(), './model.pth')
+
+
+# Ocena natančnosti na testni množici
+def evaluate_model(model, test_loader):
+    model.eval()
+    corrects = 0
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, preds = torch.max(outputs, 1)
+            corrects += torch.sum(preds == labels.data)
+
+    accuracy = corrects.double() / len(test_loader.dataset) * 100
+    print(f'Test Accuracy: {accuracy:.4f}%')
+
+
+evaluate_model(model, test_loader)
+
+model.load_state_dict(torch.load('./model.pth'))
