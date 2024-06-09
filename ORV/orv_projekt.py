@@ -4,11 +4,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader, random_split
 from torchvision.datasets import ImageFolder
-from PIL import Image
 
 
 def capture_video_and_extract_frames(user_id, duration=5, save_path='datasetraw'):
@@ -43,7 +41,7 @@ def capture_video_and_extract_frames(user_id, duration=5, save_path='datasetraw'
     cap.release()
     cv2.destroyAllWindows()
 
-#capture_video_and_extract_frames(user_id=1)
+capture_video_and_extract_frames(user_id=1)
 
 
 def preprocess_image(image_path):
@@ -73,7 +71,7 @@ def preprocess_dataset(dataset_path='datasetraw', processed_path='datasetprocess
         cv2.imwrite(processed_img_path, processed_img)
         print(f"{processed_img_path} saved.")
 
-#preprocess_dataset()
+preprocess_dataset()
 
 def augment_image(image):
     # Horizontalno zrcaljenje, sprememba svetlosti in kontrasta
@@ -126,7 +124,7 @@ def augment_dataset(dataset_path='datasetprocessed', augmented_path='datasetaugm
         print(f"{aug_img_path} saved.")
         image_index += 1
 
-#augment_dataset()
+augment_dataset()
 
 # Nalaganje dataseta
 transform = transforms.Compose([
