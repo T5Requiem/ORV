@@ -36,7 +36,7 @@ def capture_video_and_extract_frames(user_id, duration=3, save_path='datasetraw'
     cap.release()
     cv2.destroyAllWindows()
 
-# capture_video_and_extract_frames(user_id=1)
+capture_video_and_extract_frames(user_id=1)
 
 
 def preprocess_image(image_path):
@@ -66,7 +66,7 @@ def preprocess_dataset(dataset_path='datasetraw', processed_path='datasetprocess
         cv2.imwrite(processed_img_path, processed_img)
         print(f"{processed_img_path} saved.")
 
-# preprocess_dataset()
+preprocess_dataset()
 
 def augment_image(image):
     # Horizontalno zrcaljenje, sprememba svetlosti in kontrasta
@@ -86,18 +86,20 @@ def augment_image(image):
     image = cv2.warpAffine(image, M, (cols, rows))
 
     # Dodajanje šuma soli in popra
-    salt_prob = 0.01
-    pepper_prob = 0.01
-    num_salt = np.ceil(salt_prob * image.size)
-    num_pepper = np.ceil(pepper_prob * image.size)
+    salt_prob = 0.001
+    pepper_prob = 0.001
+    num_salt = np.ceil(salt_prob * image.size).astype(int)
+    num_pepper = np.ceil(pepper_prob * image.size).astype(int)
 
     # Dodaj sol
-    #salt_coords = [np.random.randint(0, image.shape[dim], int(num_salt)) for dim in range(image.ndim)]
-    #image[salt_coords] = 0
+    salt_indices = np.random.choice(image.size, num_salt, replace=False)
+    salt_coords = np.unravel_index(salt_indices, image.shape)
+    image[salt_coords] = 0
 
     # Dodaj poper
-    #pepper_coords = [np.random.randint(0, image.shape[dim], int(num_pepper)) for dim in range(image.ndim)]
-    #image[pepper_coords] = 10
+    pepper_indices = np.random.choice(image.size, num_pepper, replace=False)
+    pepper_coords = np.unravel_index(pepper_indices, image.shape)
+    image[pepper_coords] = 255
 
     return image
 
